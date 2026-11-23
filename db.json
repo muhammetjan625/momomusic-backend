@@ -1,0 +1,72 @@
+{
+  "users": [],
+  "tracks": [
+    {
+      "id": "1795367471413",
+      "title": "Kimse Görmedi",
+      "artist": "sokrates.ts0",
+      "album": "Tekli",
+      "duration": "2:43",
+      "url": "http://localhost:5000/static/music/1795367471083-803783409.mp3",
+      "cover": "http://localhost:5000/static/covers/1795367471373-162798544.jpg",
+      "uploader": "mmustakow06",
+      "createdAt": "22.11.2026 20:11:11",
+      "plays": 0,
+      "likes": []
+    },
+    {
+      "id": "1795367453552",
+      "title": "Beton Kokusu",
+      "artist": "mmustakow06",
+      "album": "Tekli",
+      "duration": "3:40",
+      "url": "http://localhost:5000/static/music/1795367452153-929002022.mp3",
+      "cover": "http://localhost:5000/static/covers/1795367452520-810026463.jpg",
+      "uploader": "mmustakow06",
+      "createdAt": "22.11.2026 20:10:53",
+      "plays": 0,
+      "likes": []
+    },
+    {
+      "id": "1794503065105",
+      "title": "Yalan DÜNYA",
+      "artist": "mmustakow06",
+      "album": "Tekli",
+      "duration": "2:43",
+      "url": "http://localhost:5000/static/music/1794503063077-41641488.mp3",
+      "cover": "http://localhost:5000/static/covers/1794503063553-830328681.jpg",
+      "uploader": "mmustakow06",
+      "createdAt": "12.11.2026 20:04:25",
+      "plays": 0,
+      "likes": []
+    },
+    {
+      "id": "1794474248881",
+      "title": "Bozkırın Evladı",
+      "artist": "mmustakow06",
+      "album": "Tekli",
+      "duration": "4:57",
+      "url": "http://localhost:5000/static/music/1794474247455-904767469.mp3",
+      "cover": "http://localhost:5000/static/covers/1794474247946-429758939.jpg",
+      "uploader": "mmustakow06",
+      "createdAt": "12.11.2026 12:04:08",
+      "plays": 5,
+      "likes": []
+    },
+    {
+      "id": "1793978036216",
+      "title": "Algorithm Heartbeat",
+      "artist": "mmustakow06",
+      "album": "Tekli",
+      "duration": "3:33",
+      "url": "http://localhost:5000/static/music/1793978035529-401740894.mp3",
+      "cover": "http://localhost:5000/static/covers/1793978035849-910146356.jpg",
+      "uploader": "mmustakow06",
+      "createdAt": "06.11.2026 18:13:56",
+      "plays": 15,
+      "likes": [
+        "mmustakow06"
+      ]
+    }
+  ]
+}
