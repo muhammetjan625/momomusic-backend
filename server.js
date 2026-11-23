@@ -8,15 +8,22 @@ const nodemailer = require('nodemailer');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-const BASE_URL =
+
+const DEFAULT_PROD_URL = 'https://momomusic-backend.onrender.com';
+const RAW_BASE_URL =
   process.env.RENDER_EXTERNAL_URL ||
   process.env.BASE_URL ||
-  `http://localhost:${PORT}`;
+  (process.env.NODE_ENV === 'production'
+    ? DEFAULT_PROD_URL
+    : `http://localhost:${PORT}`);
+
+const BASE_URL = String(RAW_BASE_URL).replace(/\/+$/, '');
 
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Render üzerinden /static/music ve /static/covers dosyalarını sun
 app.use('/static', express.static(path.join(__dirname, 'public')));
 
 const musicDir = path.join(__dirname, 'public/music');
@@ -26,8 +33,8 @@ const dbFile = path.join(__dirname, 'db.json');
 if (!fs.existsSync(musicDir)) fs.mkdirSync(musicDir, { recursive: true });
 if (!fs.existsSync(coverDir)) fs.mkdirSync(coverDir, { recursive: true });
 
-const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || 'admin@example.com').toLowerCase();
-const MAIL_USER = process.env.EMAIL_USER || 'noreply@example.com';
+const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || 'mmustakow06@gmail.com').toLowerCase();
+const MAIL_USER = process.env.EMAIL_USER || '';
 const MAIL_PASS = process.env.EMAIL_PASS || '';
 
 const transporter = nodemailer.createTransport({
@@ -38,10 +45,34 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+const resolveBaseUrl = (url = '') => {
+  if (!url || typeof url !== 'string') return '';
+  const trimmed = url.trim();
+  if (!trimmed) return '';
+
+  if (/^https?:\/\/localhost:5000/i.test(trimmed)) {
+    return trimmed.replace(/^https?:\/\/localhost:5000/i, BASE_URL);
+  }
+
+  if (trimmed.startsWith('/')) {
+    return `${BASE_URL}${trimmed}`;
+  }
+
+  return trimmed;
+};
+
+const normalizeTrackUrls = (track = {}) => ({
+  ...track,
+  url: resolveBaseUrl(track.url),
+  cover:
+    resolveBaseUrl(track.cover) ||
+    'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&auto=format&fit=crop&q=60',
+});
+
 const loadDb = () => {
   if (!fs.existsSync(dbFile)) {
     const initialData = { users: [], tracks: [] };
-    fs.writeFileSync(dbFile, JSON.stringify(initialData, null, 2));
+    fs.writeFileSync(dbFile, JSON.stringify(initialData, null, 2), 'utf8');
     return initialData;
   }
   try {
@@ -52,18 +83,20 @@ const loadDb = () => {
       tracks: Array.isArray(parsed.tracks) ? parsed.tracks : [],
     };
   } catch (err) {
+    console.error('db.json okuma hatası:', err);
     return { users: [], tracks: [] };
   }
 };
 
 const saveDb = (data) => {
-  fs.writeFileSync(dbFile, JSON.stringify(data, null, 2));
+  fs.writeFileSync(dbFile, JSON.stringify(data, null, 2), 'utf8');
 };
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     if (file.fieldname === 'audio') cb(null, musicDir);
     else if (file.fieldname === 'cover') cb(null, coverDir);
+    else cb(null, path.join(__dirname, 'public'));
   },
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
@@ -85,7 +118,7 @@ app.post('/api/auth/request-code', async (req, res) => {
   verificationCodes[email] = { code, password, isRegister, timestamp: Date.now() };
 
   const mailOptions = {
-    from: `"MusicApp" <${MAIL_USER}>`,
+    from: `"MOMOMusic" <${MAIL_USER}>`,
     to: email,
     subject: 'Giriş Doğrulama Kodunuz',
     html: `
@@ -142,19 +175,21 @@ app.post('/api/auth/verify-code', (req, res) => {
 // --- TRACKS ---
 app.get('/api/tracks', (req, res) => {
   const db = loadDb();
-  res.json(db.tracks);
+  res.json(db.tracks.map(normalizeTrackUrls));
 });
 
 app.get('/api/tracks/search', (req, res) => {
   const q = (req.query.q || '').toLowerCase();
   const db = loadDb();
-  const filtered = db.tracks.filter(
-    (t) =>
-      (t.title || '').toLowerCase().includes(q) ||
-      (t.artist || '').toLowerCase().includes(q) ||
-      (t.uploader || '').toLowerCase().includes(q) ||
-      (t.mood || '').toLowerCase().includes(q)
-  );
+  const filtered = db.tracks
+    .filter(
+      (t) =>
+        (t.title || '').toLowerCase().includes(q) ||
+        (t.artist || '').toLowerCase().includes(q) ||
+        (t.uploader || '').toLowerCase().includes(q) ||
+        (t.mood || '').toLowerCase().includes(q)
+    )
+    .map(normalizeTrackUrls);
   res.json(filtered);
 });
 
@@ -165,7 +200,7 @@ app.post('/api/tracks', (req, res) => {
     const trackId = String(incoming.id || Date.now());
 
     const existingIndex = db.tracks.findIndex((t) => String(t.id) === trackId);
-    const trackRecord = {
+    const trackRecord = normalizeTrackUrls({
       id: trackId,
       title: incoming.title || 'İsimsiz Parça',
       artist: incoming.artist || incoming.uploader || 'Bilinmeyen Sanatçı',
@@ -186,10 +221,13 @@ app.post('/api/tracks', (req, res) => {
       createdAt: incoming.createdAt || new Date().toLocaleString('tr-TR'),
       plays: Number(incoming.plays) || 0,
       likes: Array.isArray(incoming.likes) ? incoming.likes : [],
-    };
+    });
 
     if (existingIndex > -1) {
-      db.tracks[existingIndex] = { ...db.tracks[existingIndex], ...trackRecord };
+      db.tracks[existingIndex] = normalizeTrackUrls({
+        ...db.tracks[existingIndex],
+        ...trackRecord,
+      });
     } else {
       db.tracks.unshift(trackRecord);
     }
@@ -197,6 +235,7 @@ app.post('/api/tracks', (req, res) => {
     saveDb(db);
     res.json({ success: true, track: trackRecord });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: 'Şarkı db.json içine kaydedilemedi.' });
   }
 });
@@ -318,7 +357,7 @@ app.put('/api/tracks/:id', (req, res) => {
   if (mood !== undefined) track.mood = mood;
 
   saveDb(db);
-  res.json({ success: true, track });
+  res.json({ success: true, track: normalizeTrackUrls(track) });
 });
 
 app.delete('/api/tracks/:id', (req, res) => {
@@ -366,7 +405,7 @@ app.post('/api/tracks/:id/play', (req, res) => {
   const db = loadDb();
   const track = db.tracks.find((t) => String(t.id) === String(req.params.id));
   if (track) {
-    track.plays = (track.plays || 0) + 1;
+    track.plays = (Number(track.plays) || 0) + 1;
     saveDb(db);
     return res.json({ success: true, plays: track.plays });
   }
@@ -374,22 +413,25 @@ app.post('/api/tracks/:id/play', (req, res) => {
 });
 
 app.post('/api/tracks/:id/like', (req, res) => {
-  const { username } = req.body;
+  const actor = req.body?.username || req.body?.userId || req.body?.email;
   const db = loadDb();
   const track = db.tracks.find((t) => String(t.id) === String(req.params.id));
   if (!track) return res.json({ success: true });
 
-  if (!track.likes) track.likes = [];
-  const index = track.likes.indexOf(username);
-  if (index > -1) {
-    track.likes.splice(index, 1);
-  } else {
-    track.likes.push(username);
+  if (!Array.isArray(track.likes)) track.likes = [];
+  if (actor) {
+    const index = track.likes.indexOf(actor);
+    if (index > -1) {
+      track.likes.splice(index, 1);
+    } else {
+      track.likes.push(actor);
+    }
+    saveDb(db);
   }
-  saveDb(db);
+
   res.json({ success: true, likes: track.likes });
 });
 
 app.listen(PORT, () => {
-  console.log(`Sunucu ${PORT} portunda aktif.`);
+  console.log(`Sunucu ${PORT} portunda aktif. BASE_URL: ${BASE_URL}`);
 });
